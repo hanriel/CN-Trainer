@@ -1,0 +1,119 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+}
+nav button {
+  margin-right: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+nav button.active {
+  background: #007bff;
+  color: white;
+  border: none;
+}
+.ticket-btn {
+  margin: 5px;
+  padding: 5px 10px;
+}
+.question-block {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin: 15px 0;
+}
+.options label {
+  display: block;
+  margin: 5px 0;
+}
+.correct {
+  color: green;
+  font-weight: bold;
+}
+.incorrect {
+  color: red;
+  font-weight: bold;
+}
+.explanation {
+  font-style: italic;
+  margin-top: 5px;
+}
+.result-msg {
+  font-size: 1.2em;
+  margin: 20px 0;
+}
+
+/* Навигация по вопросам */
+.question-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 15px;
+}
+.question-nav-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #aaa;
+    background: #f0f0f0;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+}
+.question-nav-btn.active {
+    border: 2px solid #007bff;
+    background: #cce5ff;
+}
+.question-nav-btn.answered-correct {
+    background: #d4edda;
+    border-color: #28a745;
+}
+.question-nav-btn.answered-incorrect {
+    background: #f8d7da;
+    border-color: #dc3545;
+}
+.training-controls, .exam-controls {
+    margin-top: 20px;
+}
+.training-controls button, .exam-controls button {
+    margin-right: 8px;
+}
+.question-image {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Карточка результата */
+#training-result-card {
+    margin-top: 20px;
+}
+.result-card {
+    border: 2px solid #ccc;
+    padding: 20px;
+    border-radius: 8px;
+    background: #f9f9f9;
+    text-align: center;
+}
+.result-card h3 {
+    margin-top: 0;
+}
+.result-card p {
+    margin: 10px 0;
+}
+.result-card .result-msg {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 15px 0;
+}
+.result-card .result-msg.correct {
+    color: #28a745;
+}
+.result-card .result-msg.incorrect {
+    color: #dc3545;
+}
+.result-card button {
+    margin: 8px;
+}

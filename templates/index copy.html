@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Компьютерные сети – Обучение и экзамен</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Компьютерные сети: билеты</h1>
+      <nav>
+        <button id="mode-training" class="active">Тренировка</button>
+        <button id="mode-exam">Экзамен</button>
+      </nav>
+    </header>
+    <main>
+      <!-- Режим тренировки -->
+      <section id="training-section" style="display: block;">
+        <h2>Выберите билет для тренировки</h2>
+        <div id="ticket-list"></div>
+        <div id="training-questions" style="display: none;"></div>
+      </section>
+
+      <!-- Режим экзамена -->
+      <section id="exam-section" style="display: none;">
+        <button id="start-exam-btn">Начать экзамен</button>
+        <div id="exam-info" style="display: none;"></div>
+        <div id="exam-questions" style="display: none;"></div>
+        <div id="exam-result" style="display: none;"></div>
+      </section>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
