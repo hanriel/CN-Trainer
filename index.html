@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Компьютерные сети – Тренировка и экзамен</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+    header h1 { margin-bottom: 5px; }
+    nav button {
+      margin-right: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      border: 1px solid #aaa;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    nav button.active {
+      background: #007bff;
+      color: #fff;
+      border-color: #007bff;
+    }
+    .ticket-btn {
+      margin: 5px;
+      padding: 6px 12px;
+    }
+    .question-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin: 15px 0;
+    }
+    .question-nav-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #aaa;
+      background: #f0f0f0;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .question-nav-btn.active {
+      border: 2px solid #007bff;
+      background: #cce5ff;
+    }
+    .question-nav-btn.answered-correct {
+      background: #d4edda;
+      border-color: #28a745;
+    }
+    .question-nav-btn.answered-incorrect {
+      background: #f8d7da;
+      border-color: #dc3545;
+    }
+    .question-block {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 6px;
+    }
+    .options label {
+      display: block;
+      margin: 8px 0;
+    }
+    .correct { color: green; font-weight: bold; }
+    .incorrect { color: red; font-weight: bold; }
+    .explanation {
+      font-style: italic;
+      margin-top: 5px;
+      color: #555;
+    }
+    .question-image {
+      max-width: 100%;
+      height: auto;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .training-controls, .exam-controls {
+      margin-top: 20px;
+    }
+    .training-controls button, .exam-controls button {
+      margin-right: 8px;
+    }
+    .result-card {
+      border: 2px solid #ccc;
+      padding: 20px;
+      border-radius: 8px;
+      background: #f9f9f9;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .result-card h3 { margin-top: 0; }
+    .result-card .result-msg {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+    .result-msg.correct { color: #28a745; }
+    .result-msg.incorrect { color: #dc3545; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Компьютерные сети: билеты</h1>
+      <nav>
+        <button id="mode-training" class="active">Тренировка</button>
+        <button id="mode-exam">Экзамен</button>
+      </nav>
+    </header>
+    <main>
+      <section id="training-section">
+        <h2>Выберите билет</h2>
+        <div id="ticket-list"></div>
+        <div id="training-questions" style="display: none;"></div>
+      </section>
+      <section id="exam-section" style="display: none;">
+        <button id="start-exam-btn">Начать экзамен</button>
+        <div id="exam-info" style="display: none;"></div>
+        <div id="exam-questions" style="display: none;"></div>
+        <div id="exam-result" style="display: none;"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ---------- КОНФИГУРАЦИЯ ----------
+    const QUESTIONS_URL = 'https://raw.githubusercontent.com/hanriel/CN-Trainer/refs/heads/main/tickets.json';
+
+    // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
+    let allTickets = [];
+    let currentMode = 'training';
+    let currentTicket = null;          // текущий билет (с вопросами)
+    let currentQuestionIndex = 0;
+    let trainingProgress = {};         // ticketId -> { questionId: {...} }
+    let examTicket = null;
+    let examAnswered = {};             // questionId -> { selected, is_correct, ... }
+    let examErrorCount = 0;
+
+    // DOM
+    const trainingSection = document.getElementById('training-section');
+    const examSection = document.getElementById('exam-section');
+    const modeTrainingBtn = document.getElementById('mode-training');
+    const modeExamBtn = document.getElementById('mode-exam');
+    const ticketListDiv = document.getElementById('ticket-list');
+    const trainingQuestionsDiv = document.getElementById('training-questions');
+    const startExamBtn = document.getElementById('start-exam-btn');
+    const examInfoDiv = document.getElementById('exam-info');
+    const examQuestionsDiv = document.getElementById('exam-questions');
+    const examResultDiv = document.getElementById('exam-result');
+
+    // ---------- ЗАГРУЗКА ДАННЫХ ----------
+    async function loadData() {
+      try {
+        const resp = await fetch(QUESTIONS_URL);
+        allTickets = await resp.json();
+        renderTicketList();
+      } catch (err) {
+        alert('Ошибка загрузки вопросов: ' + err.message);
+      }
+    }
+
+    // ---------- ПЕРЕМЕШИВАНИЕ ВАРИАНТОВ ----------
+    function shuffleArray(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function prepareQuestion(q) {
+      const indices = q.options.map((_, i) => i);
+      const shuffledIndices = shuffleArray(indices);
+      q.shuffledOptions = shuffledIndices.map(i => q.options[i]);
+      q.shuffledCorrectIndex = shuffledIndices.indexOf(q.correct);
+      // маппинги
+      q.shuffledToOriginal = {};
+      q.originalToShuffled = {};
+      shuffledIndices.forEach((origIdx, shuffIdx) => {
+        q.shuffledToOriginal[shuffIdx] = origIdx;
+        q.originalToShuffled[origIdx] = shuffIdx;
+      });
+    }
+
+    // ---------- localStorage для тренировки ----------
+    const STORAGE_KEY = 'network_training_progress';
+    function loadProgress() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      trainingProgress = saved ? JSON.parse(saved) : {};
+    }
+    function saveProgress() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trainingProgress));
+    }
+    function clearTicketProgress(ticketId) {
+      delete trainingProgress[ticketId];
+      saveProgress();
+    }
+
+    // ---------- ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ ----------
+    modeTrainingBtn.addEventListener('click', () => switchMode('training'));
+    modeExamBtn.addEventListener('click', () => switchMode('exam'));
+
+    function switchMode(mode) {
+      currentMode = mode;
+      if (mode === 'training') {
+        trainingSection.style.display = 'block';
+        examSection.style.display = 'none';
+        modeTrainingBtn.classList.add('active');
+        modeExamBtn.classList.remove('active');
+        trainingQuestionsDiv.style.display = 'none';
+        ticketListDiv.style.display = 'block';
+      } else {
+        trainingSection.style.display = 'none';
+        examSection.style.display = 'block';
+        modeTrainingBtn.classList.remove('active');
+        modeExamBtn.classList.add('active');
+        resetExamUI();
+      }
+    }
+
+    // ---------- ТРЕНИРОВКА ----------
+    function renderTicketList() {
+      ticketListDiv.innerHTML = '';
+      allTickets.forEach(ticket => {
+        const btn = document.createElement('button');
+        btn.className = 'ticket-btn';
+        btn.textContent = ticket.title;
+        btn.addEventListener('click', () => openTrainingTicket(ticket.id));
+        ticketListDiv.appendChild(btn);
+      });
+    }
+
+    function openTrainingTicket(ticketId) {
+      currentTicket = allTickets.find(t => t.id === ticketId);
+      if (!currentTicket) return;
+      // перемешиваем варианты в каждом вопросе (если ещё не перемешаны)
+      currentTicket.questions.forEach(q => { if (!q.shuffledOptions) prepareQuestion(q); });
+      currentQuestionIndex = 0;
+      ticketListDiv.style.display = 'none';
+      trainingQuestionsDiv.style.display = 'block';
+      renderTrainingInterface();
+    }
+
+    function renderTrainingInterface() {
+      const questions = currentTicket.questions;
+      const progress = trainingProgress[currentTicket.id] || {};
+
+      let navHtml = '<div class="question-nav">';
+      questions.forEach((q, idx) => {
+        const saved = progress[q.id];
+        let cls = '';
+        if (saved) cls = saved.is_correct ? 'answered-correct' : 'answered-incorrect';
+        navHtml += `<button class="question-nav-btn ${cls}" data-index="${idx}">${idx + 1}</button>`;
+      });
+      navHtml += '</div>';
+
+      trainingQuestionsDiv.innerHTML = `
+        <h3>${currentTicket.title}</h3>
+        ${navHtml}
+        <div id="current-question-container"></div>
+        <div id="training-result-card" style="display: none;"></div>
+        <div class="training-controls">
+          <button id="prev-btn" ${currentQuestionIndex === 0 ? 'disabled' : ''}>← Назад</button>
+          <button id="next-btn" ${currentQuestionIndex === questions.length - 1 ? 'disabled' : ''}>Вперёд →</button>
+          <button id="back-btn">← К списку билетов</button>
+          <button id="reset-btn">Сбросить прогресс билета</button>
+        </div>
+      `;
+
+      document.querySelectorAll('.question-nav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.target.dataset.index);
+          goToTrainingQuestion(idx);
+        });
+      });
+      document.getElementById('prev-btn').addEventListener('click', () => {
+        if (currentQuestionIndex > 0) goToTrainingQuestion(currentQuestionIndex - 1);
+      });
+      document.getElementById('next-btn').addEventListener('click', () => {
+        if (currentQuestionIndex < questions.length - 1) goToTrainingQuestion(currentQuestionIndex + 1);
+      });
+      document.getElementById('back-btn').addEventListener('click', () => {
+        trainingQuestionsDiv.style.display = 'none';
+        ticketListDiv.style.display = 'block';
+      });
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        clearTicketProgress(currentTicket.id);
+        currentQuestionIndex = 0;
+        renderTrainingInterface();
+        goToTrainingQuestion(0);
+      });
+
+      goToTrainingQuestion(currentQuestionIndex);
+      checkTrainingCompletion();
+    }
+
+    function goToTrainingQuestion(index) {
+      const questions = currentTicket.questions;
+      if (index < 0 || index >= questions.length) return;
+      currentQuestionIndex = index;
+
+      document.getElementById('training-result-card').style.display = 'none';
+      document.getElementById('current-question-container').style.display = 'block';
+      document.querySelector('.question-nav').style.display = '';
+      document.querySelector('.training-controls').style.display = '';
+
+      renderTrainingQuestion();
+      document.getElementById('prev-btn').disabled = (index === 0);
+      document.getElementById('next-btn').disabled = (index === questions.length - 1);
+
+      document.querySelectorAll('.question-nav-btn').forEach(btn => {
+        const i = parseInt(btn.dataset.index);
+        btn.classList.toggle('active', i === index);
+      });
+    }
+
+    function renderTrainingQuestion() {
+      const container = document.getElementById('current-question-container');
+      const q = currentTicket.questions[currentQuestionIndex];
+      const progress = trainingProgress[currentTicket.id] || {};
+      const saved = progress[q.id];
+
+      let imgHtml = q.image ? `<img src="${q.image}" class="question-image" alt="Иллюстрация">` : '';
+
+      container.innerHTML = `
+        <div class="question-block">
+          ${imgHtml}
+          <p><strong>${q.text}</strong></p>
+          <div class="options">
+            ${q.shuffledOptions.map((opt, shuffIdx) => `
+              <label>
+                <input type="radio" name="training-opt" value="${shuffIdx}" 
+                  ${saved && q.originalToShuffled[saved.selected] === shuffIdx ? 'checked' : ''}>
+                ${opt}
+              </label>
+            `).join('')}
+          </div>
+          <button id="check-training-btn" ${saved ? 'disabled' : ''}>Проверить</button>
+          <div id="training-result-text"></div>
+        </div>
+      `;
+
+      if (saved) {
+        showTrainingResult(saved, q);
+      }
+
+      const checkBtn = document.getElementById('check-training-btn');
+      if (checkBtn && !saved) {
+        checkBtn.addEventListener('click', () => {
+          const selectedRadio = document.querySelector('input[name="training-opt"]:checked');
+          if (!selectedRadio) {
+            alert('Выберите ответ');
+            return;
+          }
+          const shuffIdx = parseInt(selectedRadio.value);
+          const origIdx = q.shuffledToOriginal[shuffIdx];
+          const isCorrect = (origIdx === q.correct);
+          const answerData = {
+            selected: origIdx,
+            is_correct: isCorrect,
+            correct_index: q.correct,
+            explanation: q.explanation || ''
+          };
+          // Сохраняем
+          if (!trainingProgress[currentTicket.id]) trainingProgress[currentTicket.id] = {};
+          trainingProgress[currentTicket.id][q.id] = answerData;
+          saveProgress();
+          showTrainingResult(answerData, q);
+          checkBtn.disabled = true;
+          updateTrainingNavButton(currentQuestionIndex, isCorrect);
+          checkTrainingCompletion();
+        });
+      }
+    }
+
+    function showTrainingResult(data, q) {
+      const div = document.getElementById('training-result-text');
+      if (data.is_correct) {
+        div.innerHTML = '<span class="correct">Правильно!</span>';
+      } else {
+        div.innerHTML = `<span class="incorrect">Неправильно.</span> Правильный ответ: ${q.options[data.correct_index]}`;
+      }
+      if (data.explanation) {
+        div.innerHTML += `<p class="explanation">${data.explanation}</p>`;
+      }
+    }
+
+    function updateTrainingNavButton(index, isCorrect) {
+      const btn = document.querySelector(`.question-nav-btn[data-index="${index}"]`);
+      if (btn) {
+        btn.classList.add(isCorrect ? 'answered-correct' : 'answered-incorrect');
+      }
+    }
+
+    function checkTrainingCompletion() {
+      const questions = currentTicket.questions;
+      const progress = trainingProgress[currentTicket.id] || {};
+      const allAnswered = questions.every(q => progress[q.id]);
+      if (!allAnswered) return;
+
+      let correct = 0;
+      questions.forEach(q => { if (progress[q.id].is_correct) correct++; });
+      const errors = questions.length - correct;
+      const passed = errors < 4;
+
+      const card = document.getElementById('training-result-card');
+      card.style.display = 'block';
+      card.innerHTML = `
+        <div class="result-card">
+          <h3>Билет: ${currentTicket.title}</h3>
+          <p>Правильных ответов: <strong>${correct}</strong> из ${questions.length}</p>
+          <p>Ошибок: <strong>${errors}</strong></p>
+          <div class="result-msg ${passed ? 'correct' : 'incorrect'}">
+            ${passed ? '✅ Билет сдан! (допустимо не более 3 ошибок)' : '❌ Билет не сдан.'}
+          </div>
+          <button id="retry-btn">Пройти заново</button>
+          <button id="to-list-btn">← К списку билетов</button>
+        </div>
+      `;
+      document.getElementById('current-question-container').style.display = 'none';
+      document.querySelector('.question-nav').style.display = 'none';
+      document.querySelector('.training-controls').style.display = 'none';
+
+      document.getElementById('retry-btn').addEventListener('click', () => {
+        clearTicketProgress(currentTicket.id);
+        currentQuestionIndex = 0;
+        renderTrainingInterface();
+        goToTrainingQuestion(0);
+      });
+      document.getElementById('to-list-btn').addEventListener('click', () => {
+        trainingQuestionsDiv.style.display = 'none';
+        ticketListDiv.style.display = 'block';
+      });
+    }
+
+    // ---------- ЭКЗАМЕН ----------
+    function resetExamUI() {
+      startExamBtn.style.display = 'block';
+      examInfoDiv.style.display = 'none';
+      examQuestionsDiv.style.display = 'none';
+      examResultDiv.style.display = 'none';
+    }
+
+    startExamBtn.addEventListener('click', startExam);
+
+    function startExam() {
+      if (allTickets.length === 0) return;
+      const randomTicket = allTickets[Math.floor(Math.random() * allTickets.length)];
+      examTicket = {
+        ...randomTicket,
+        questions: randomTicket.questions.map(q => ({ ...q }))
+      };
+      examTicket.questions.forEach(q => { if (!q.shuffledOptions) prepareQuestion(q); });
+      examAnswered = {};
+      examErrorCount = 0;
+      currentQuestionIndex = 0;
+      startExamBtn.style.display = 'none';
+      examInfoDiv.style.display = 'block';
+      examInfoDiv.innerHTML = `<h3>Экзаменационный билет: ${examTicket.title}</h3><p>Ответьте на все вопросы без ошибок.</p>`;
+      examQuestionsDiv.style.display = 'block';
+      renderExamInterface();
+    }
+
+    function renderExamInterface() {
+      const questions = examTicket.questions;
+      let navHtml = '<div class="question-nav">';
+      questions.forEach((q, idx) => {
+        const answered = examAnswered[q.id];
+        let cls = '';
+        if (answered) cls = answered.is_correct ? 'answered-correct' : 'answered-incorrect';
+        navHtml += `<button class="question-nav-btn ${cls}" data-index="${idx}">${idx + 1}</button>`;
+      });
+      navHtml += '</div>';
+
+      examQuestionsDiv.innerHTML = `
+        ${navHtml}
+        <div id="exam-current-container"></div>
+        <div class="exam-controls">
+          <button id="exam-prev" ${currentQuestionIndex === 0 ? 'disabled' : ''}>← Назад</button>
+          <button id="exam-next" ${currentQuestionIndex === questions.length - 1 ? 'disabled' : ''}>Вперёд →</button>
+          <button id="finish-exam-btn" style="display: none;">Завершить экзамен</button>
+        </div>
+      `;
+
+      document.querySelectorAll('#exam-section .question-nav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.target.dataset.index);
+          goToExamQuestion(idx);
+        });
+      });
+      document.getElementById('exam-prev').addEventListener('click', () => {
+        if (currentQuestionIndex > 0) goToExamQuestion(currentQuestionIndex - 1);
+      });
+      document.getElementById('exam-next').addEventListener('click', () => {
+        if (currentQuestionIndex < questions.length - 1) goToExamQuestion(currentQuestionIndex + 1);
+      });
+
+      goToExamQuestion(currentQuestionIndex);
+    }
+
+    function goToExamQuestion(index) {
+      const questions = examTicket.questions;
+      if (index < 0 || index >= questions.length) return;
+      currentQuestionIndex = index;
+      renderExamQuestion();
+
+      document.getElementById('exam-prev').disabled = (index === 0);
+      document.getElementById('exam-next').disabled = (index === questions.length - 1);
+
+      document.querySelectorAll('#exam-section .question-nav-btn').forEach(btn => {
+        const i = parseInt(btn.dataset.index);
+        btn.classList.toggle('active', i === index);
+      });
+      checkExamCompletion();
+    }
+
+    function renderExamQuestion() {
+      const container = document.getElementById('exam-current-container');
+      const q = examTicket.questions[currentQuestionIndex];
+      const answered = examAnswered[q.id];
+
+      let imgHtml = q.image ? `<img src="${q.image}" class="question-image" alt="Иллюстрация">` : '';
+
+      container.innerHTML = `
+        <div class="question-block">
+          ${imgHtml}
+          <p><strong>${q.text}</strong></p>
+          <div class="options">
+            ${q.shuffledOptions.map((opt, shuffIdx) => `
+              <label>
+                <input type="radio" name="exam-opt" value="${shuffIdx}" 
+                  ${answered && q.originalToShuffled[answered.selected] === shuffIdx ? 'checked' : ''}
+                  ${answered ? 'disabled' : ''}>
+                ${opt}
+              </label>
+            `).join('')}
+          </div>
+          <button id="exam-check-btn" ${answered ? 'disabled' : ''}>Ответить</button>
+          <div id="exam-result-text"></div>
+        </div>
+      `;
+
+      if (answered) {
+        showExamResult(answered, q);
+      }
+
+      const checkBtn = document.getElementById('exam-check-btn');
+      if (checkBtn && !answered) {
+        checkBtn.addEventListener('click', () => {
+          const radio = document.querySelector('input[name="exam-opt"]:checked');
+          if (!radio) {
+            alert('Выберите ответ');
+            return;
+          }
+          const shuffIdx = parseInt(radio.value);
+          const origIdx = q.shuffledToOriginal[shuffIdx];
+          const isCorrect = (origIdx === q.correct);
+          const answerData = {
+            selected: origIdx,
+            is_correct: isCorrect,
+            correct_index: q.correct,
+            explanation: q.explanation || ''
+          };
+          examAnswered[q.id] = answerData;
+          if (!isCorrect) examErrorCount++;
+          showExamResult(answerData, q);
+          checkBtn.disabled = true;
+          document.querySelectorAll('input[name="exam-opt"]').forEach(r => r.disabled = true);
+          updateExamNavButton(currentQuestionIndex, isCorrect);
+          checkExamCompletion();
+        });
+      }
+    }
+
+    function showExamResult(data, q) {
+      const div = document.getElementById('exam-result-text');
+      if (data.is_correct) {
+        div.innerHTML = '<span class="correct">Правильно!</span>';
+      } else {
+        div.innerHTML = `<span class="incorrect">Ошибка.</span> Правильный ответ: ${q.options[data.correct_index]}`;
+      }
+      if (data.explanation) {
+        div.innerHTML += `<p class="explanation">${data.explanation}</p>`;
+      }
+    }
+
+    function updateExamNavButton(index, isCorrect) {
+      const btn = document.querySelector(`#exam-section .question-nav-btn[data-index="${index}"]`);
+      if (btn) {
+        btn.classList.add(isCorrect ? 'answered-correct' : 'answered-incorrect');
+      }
+    }
+
+    function checkExamCompletion() {
+      const allAnswered = examTicket.questions.every(q => examAnswered[q.id]);
+      const finishBtn = document.getElementById('finish-exam-btn');
+      if (allAnswered) {
+        finishBtn.style.display = 'inline-block';
+        finishBtn.onclick = showExamResultCard;
+      } else {
+        finishBtn.style.display = 'none';
+      }
+    }
+
+    function showExamResultCard() {
+      const passed = examErrorCount === 0;
+      examResultDiv.style.display = 'block';
+      examResultDiv.innerHTML = `
+        <div class="result-card">
+          <h3>Результат экзамена</h3>
+          <p>Ошибок: ${examErrorCount}</p>
+          <div class="result-msg ${passed ? 'correct' : 'incorrect'}">
+            ${passed ? '✅ Экзамен сдан!' : '❌ Экзамен не сдан. Допускается 0 ошибок.'}
+          </div>
+          <button id="retry-exam-btn">Пересдать</button>
+        </div>
+      `;
+      examQuestionsDiv.style.display = 'none';
+      document.getElementById('retry-exam-btn').addEventListener('click', () => {
+        resetExamUI();
+        startExam();
+      });
+    }
+
+    // ---------- СТАРТ ----------
+    loadProgress();
+    loadData();
+  </script>
+</body>
+</html>
