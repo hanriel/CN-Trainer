@@ -418,7 +418,7 @@
           <p>Правильных ответов: <strong>${correct}</strong> из ${questions.length}</p>
           <p>Ошибок: <strong>${errors}</strong></p>
           <div class="result-msg ${passed ? 'correct' : 'incorrect'}">
-            ${passed ? '✅ Билет сдан! (допустимо не более 3 ошибок)' : '❌ Билет не сдан.'}
+            ${passed ? '✅ Билет сдан!' : '❌ Билет не сдан.'}
           </div>
           <button id="retry-btn">Пройти заново</button>
           <button id="to-list-btn">← К списку билетов</button>
@@ -617,7 +617,7 @@
           <h3>Результат экзамена</h3>
           <p>Ошибок: ${examErrorCount}</p>
           <div class="result-msg ${passed ? 'correct' : 'incorrect'}">
-            ${passed ? '✅ Экзамен сдан!' : '❌ Экзамен не сдан. Допускается 0 ошибок.'}
+            ${passed ? '✅ Экзамен сдан!' : '❌ Экзамен не сдан.'}
           </div>
           <button id="retry-exam-btn">Пересдать</button>
         </div>
