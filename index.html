@@ -107,7 +107,7 @@
 <body>
   <div id="app">
     <header>
-      <h1>Компьютерные сети: билеты</h1>
+      <h1>Компьютерные сети - Тренажер</h1>
       <nav>
         <button id="mode-training" class="active">Тренировка</button>
         <button id="mode-exam">Экзамен</button>
@@ -128,6 +128,7 @@
     </main>
   </div>
 
+  <script src="certificate.js"></script>
   <script>
     // ---------- КОНФИГУРАЦИЯ ----------
     const QUESTIONS_URL = 'https://raw.githubusercontent.com/hanriel/CN-Trainer/refs/heads/main/tickets.json';
@@ -463,7 +464,7 @@
       currentQuestionIndex = 0;
       startExamBtn.style.display = 'none';
       examInfoDiv.style.display = 'block';
-      examInfoDiv.innerHTML = `<h3>Экзаменационный билет: ${examTicket.title}</h3><p>Ответьте на все вопросы без ошибок.</p>`;
+      examInfoDiv.innerHTML = `<h2>Экзаменационный билет: ${examTicket.title}</h2><p>Ответьте на все вопросы без ошибок.</p>`;
       examQuestionsDiv.style.display = 'block';
       renderExamInterface();
     }
@@ -611,21 +612,60 @@
 
     function showExamResultCard() {
       const passed = examErrorCount === 0;
+      const totalQuestions = examTicket.questions.length;
       examResultDiv.style.display = 'block';
-      examResultDiv.innerHTML = `
-        <div class="result-card">
-          <h3>Результат экзамена</h3>
-          <p>Ошибок: ${examErrorCount}</p>
-          <div class="result-msg ${passed ? 'correct' : 'incorrect'}">
-            ${passed ? '✅ Экзамен сдан!' : '❌ Экзамен не сдан.'}
-          </div>
-          <button id="retry-exam-btn">Пересдать</button>
-        </div>
+
+      let html = `
+          <div class="result-card">
+              <h3>Результат экзамена</h3>
+              <p>Ошибок: ${examErrorCount}</p>
+              <div class="result-msg ${passed ? 'correct' : 'incorrect'}">
+                  ${passed ? '✅ Экзамен сдан!' : '❌ Экзамен не сдан.'}
+              </div>
       `;
+
+      if (passed) {
+          const name = prompt('Введите ваше имя для сертификата:', 'Студент');
+          if (name) {
+              const dataUrl = window.CertificateGenerator.generate(
+                  name,
+                  examTicket.title,
+                  examErrorCount,
+                  totalQuestions
+              );
+              // Сохраняем для скачивания
+              examResultDiv._certDataUrl = dataUrl;
+              examResultDiv._certFileName = window.CertificateGenerator.getFileName(name, examTicket.title) + '.png';
+
+              html += `
+                  <div style="margin: 20px 0;">
+                      <img src="${dataUrl}" alt="Сертификат" style="max-width: 100%; border: 1px solid #ccc;">
+                  </div>
+                  <button id="download-cert-btn">Скачать сертификат</button>
+              `;
+          }
+      }
+
+      html += `<button id="retry-exam-btn">Пересдать</button></div>`;
+      examResultDiv.innerHTML = html;
       examQuestionsDiv.style.display = 'none';
+
+      // Обработчик скачивания
+      if (passed) {
+          const downloadBtn = document.getElementById('download-cert-btn');
+          if (downloadBtn) {
+              downloadBtn.addEventListener('click', function() {
+                  const link = document.createElement('a');
+                  link.download = examResultDiv._certFileName;
+                  link.href = examResultDiv._certDataUrl;
+                  link.click();
+              });
+          }
+      }
+
       document.getElementById('retry-exam-btn').addEventListener('click', () => {
-        resetExamUI();
-        startExam();
+          resetExamUI();
+          startExam();
       });
     }
 
